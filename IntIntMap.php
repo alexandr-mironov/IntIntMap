@@ -32,7 +32,8 @@ class IntIntMap
     public function __construct(resource $shm_id, int $size)
     {
         $this->shmopID = $shm_id;
-        if($size <= 0){
+        // Reserved memory cannot be less than one chunk
+        if($size <= self::CHUNK_SIZE){
             throw new \Exception('Invalid shmop size');
         }
         // Split reserved memory to chunks, and reduce at 1 chunk to not overflow reserved memory
