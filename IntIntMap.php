@@ -7,13 +7,20 @@
  * для доступа к памяти напрямую необходимо (и достаточно) использовать следующие два метода:
  * \shmop_read и \shmop_write
  */
+
+/**
+ * Class IntIntMap
+ * Eazyest way - it's split reserved memory to chunks and translate key to offset in memory,
+ * for more efficient convert values to 36 base, then we can reduce chunk size to 13 symbols,
+ * it's almost 20% profit (comparison with hex)
+ */
 class IntIntMap
 {
-    // string size of 36 base PHP_INT_MAX
+    /** @var int string size of 36 base PHP_INT_MAX */
     private const CHUNK_SIZE = 13;
-    //
+    /** @var resource shmop_open result store */
     private $shmopID;
-    // Quantity of chunks reserved memory
+    /** @var int Quantity of chunks reserved memory */
     private $chunkQuantity = 0;
 
     /**
@@ -28,36 +35,39 @@ class IntIntMap
         if($size <= 0){
             throw new \Exception('Invalid shmop size');
         }
-        // Split reserved memory to chunks
+        // Split reserved memory to chunks, and reduce at 1 chunk to not overflow reserved memory
         $this->chunkQuantity = intdiv($size, self::CHUNK_SIZE) - 1;
     }
 
     /**
      * GetOffset method
-     * hash key to some offset shorter then
+     * Translate key to offset in shared memory
      * @param int $key
      * @return int
      */
     private function getOffset(int $key): int
     {
+        // hashing int
         $key = (~$key) + ($key << 21);
-        $key = $key ^ $this->usr($key, 24);
+        $key = $key ^ $this->unsignedRightShift($key, 24);
         $key = ($key + ($key << 3)) + ($key << 8);
-        $key = $key ^ $this->usr($key, 14);
+        $key = $key ^ $this->unsignedRightShift($key, 14);
         $key = ($key + ($key << 2)) + ($key << 4);
-        $key = $key ^ $this->usr($key, 28);
+        $key = $key ^ $this->unsignedRightShift($key, 28);
         $key = $key + ($key << 63);
+        // To key will always less than chunk quantity
         $key = $key & $this->chunkQuantity;
+        // There $key is a number of chunk, let's multiply to chunk size to get they offset
         return (int) $key * self::CHUNK_SIZE;
     }
 
     /**
-     * Unsigned shift right basic implementation
+     * Unsigned right shift basic implementation
      * @param int $a - value
      * @param int $b - steps
      * @return int
      */
-    private function usr(int $a, int $b)
+    private function unsignedRightShift(int $a, int $b): int
     {
         return(($b)?($a>>$b)&~(1<<(8*PHP_INT_SIZE-1)>>($b-1)):$a);
     }
