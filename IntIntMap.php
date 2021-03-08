@@ -43,6 +43,9 @@ class IntIntMap
     /**
      * GetOffset method
      * Translate key to offset in shared memory
+     * ! Solution useless in small chunk quantities
+     *
+     * @link http://sandbox.onlinephpfunctions.com/code/a73ff2bff29e174f9f2a335d3adef5f8e580ddb1 - sandbox to check examples of results
      * @param int $key
      * @return int
      */
@@ -111,6 +114,7 @@ class IntIntMap
     }
 
     /**
+     * convert int from 36 to 10 base
      * @param string $value
      * @return int
      */
