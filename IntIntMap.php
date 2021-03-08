@@ -66,7 +66,7 @@ class IntIntMap
     }
 
     /**
-     * Unsigned right shift basic implementation
+     * Unsigned right shift basic implementation ">>>" operator in Java/JS
      * @param int $a - value
      * @param int $b - steps
      * @return int
