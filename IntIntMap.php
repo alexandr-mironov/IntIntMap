@@ -19,11 +19,21 @@ class IntIntMap
     /** @var int string size of 36 base PHP_INT_MAX */
     private const CHUNK_SIZE = 13;
 
+    /** @var int string size of pair key + value in 36 base */
+    private const DOUBLE_CHUNK_SIZE = 26;
+
     /** @var resource shmop_open result store */
     private $shmopID;
 
     /** @var int Quantity of chunks reserved memory */
     private $chunkQuantity = 0;
+
+    private const TRYS_LIMIT = 5;
+
+    /**
+     * @var int size of shared memory
+     */
+    private $size;
 
     /**
      * IntIntMap constructor.
@@ -35,12 +45,13 @@ class IntIntMap
     public function __construct(resource $shm_id, int $size)
     {
         $this->shmopID = $shm_id;
-        // Reserved memory cannot be less than one chunk
-        if ($size <= self::CHUNK_SIZE) {
+        $this->size = $size;
+        // Reserved memory cannot be less than one pair key value
+        if ($size <= self::DOUBLE_CHUNK_SIZE) {
             throw new Exception('Invalid shmop size');
         }
         // Split reserved memory to chunks, and reduce at 1 chunk to not overflow reserved memory
-        $this->chunkQuantity = intdiv($size, self::CHUNK_SIZE) - 1;
+        $this->chunkQuantity = intdiv($size, self::DOUBLE_CHUNK_SIZE) - 1;
     }
 
     /**
@@ -67,11 +78,62 @@ class IntIntMap
      */
     public function get(int $key): ?int
     {
-        if ($value = shmop_read($this->shmopID, $this->getOffset($key), self::CHUNK_SIZE)) {
-            $res = $this->decodeValue($value);
+        // todo: read pairs until find required key (or set limit of next offset try's)
+        $trys = 0;
+        $foundedKey = null;
+        $offset = $this->getOffset($key);
+        while ($trys < self::TRYS_LIMIT) {
+            $trys++;
+            $pair = $this->readPair($offset);
+            if ($pair[0] === null) {
+                return null;
+            }
+            if ($key === $pair[0]) {
+                return $pair[1];
+            }
+            $offset = $this->getNextOffset($offset);
+        }
+        
+        return null;
+    }
+
+    private function readPair(int $offset): array
+    {
+
+    }
+
+    private function writePair(int $key, int $value): ?int
+    {
+
+    }
+
+    private function getPairByOffset(int $key): array
+    {
+        $pair = shmop_read($this->shmopID, $this->getOffset($key), self::DOUBLE_CHUNK_SIZE);
+        if ($pair === false) {
+            throw new Exception('Unable to read data');
+        }
+    }
+
+    /**
+     * @param int $offset
+     *
+     * @return int
+     */
+    private function getNextOffset(int $offset): int
+    {
+        $nextOffsetStart = $offset + self::DOUBLE_CHUNK_SIZE;
+        $nextOffsetEnd = $nextOffsetStart + self::DOUBLE_CHUNK_SIZE;
+        if (
+            $nextOffsetStart > PHP_INT_MAX
+            || $nextOffsetStart > $this->size
+            || $nextOffsetEnd > PHP_INT_MAX
+            || $nextOffsetEnd > $this->size
+        ) {
+            throw new OutOfRangeException('Offset out of shared memory page');
         }
 
-        return $res ?? null;
+        return $nextOffsetStart;
     }
 
     /**
@@ -132,6 +194,16 @@ class IntIntMap
      */
     private function encodeValue(int $value): string
     {
-        return str_pad(base_convert(strval($value), 10, 36), self::CHUNK_SIZE, '0', STR_PAD_LEFT);
+        return str_pad(
+            base_convert(strval($value), 10, 36),
+            self::CHUNK_SIZE,
+            '0',
+            STR_PAD_LEFT
+        );
+    }
+
+    private function getKey(array $pair): int
+    {
+        return $this->decodeValue(substr($pair,));
     }
 }
